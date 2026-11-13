@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRUD: Create, Read, Update</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; max-width: 600px; margin: auto; background-color: #f4f4f9; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        input { padding: 10px; width: calc(100% - 22px); margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px 15px; background-color: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #2980b9; }
+        .btn-edit { background-color: #f39c12; margin-top: 10px; width: auto; font-size: 0.9em; }
+        .btn-edit:hover { background-color: #e67e22; }
+        .btn-cancel { background-color: #95a5a6; }
+        .btn-cancel:hover { background-color: #7f8c8d; }
+        .record-item { border-left: 4px solid #3498db; padding: 15px; margin-bottom: 10px; background: #f9f9f9; display: flex; flex-direction: column; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <!-- FORM SECTION (Handles both Create and Update) -->
+    <div class="card">
+        <h2 id="formTitle">Add a New Record</h2>
+        <form id="recordForm">
+            <input type="hidden" id="recordId">
+            <input type="text" id="titleInput" placeholder="Record Title" required>
+            <input type="text" id="detailsInput" placeholder="Record Details" required>
+            <div style="display: flex; gap: 10px;">
+                <button type="submit" id="submitBtn" style="flex: 1;">Submit Record</button>
+                <button type="button" id="cancelBtn" class="btn-cancel hidden" style="flex: 1;" onclick="resetForm()">Cancel Edit</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- READ SECTION -->
+    <div class="card">
+        <h2>Currently Stored Records</h2>
+        <div id="recordsContainer">
+            <p>Loading records...</p>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8000/records";
+        const form = document.getElementById('recordForm');
+        const container = document.getElementById('recordsContainer');
+        const formTitle = document.getElementById('formTitle');
+        const submitBtn = document.getElementById('submitBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+
+        // READ: Fetch data from FastAPI
+        async function fetchRecords() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                
+                container.innerHTML = '';
+                
+                if (data.length === 0) {
+                    container.innerHTML = '<p>No records found. Add one above!</p>';
+                    return;
+                }
+
+                data.forEach(record => {
+                    const div = document.createElement('div');
+                    div.className = 'record-item';
+                    div.innerHTML = `
+                        <div><strong>${record.title}</strong>: ${record.details}</div>
+                        <button class="btn-edit" onclick="editRecord(${record.id}, '${record.title}', '${record.details}')">Edit</button>
+                    `;
+                    container.appendChild(div);
+                });
+            } catch (error) {
+                container.innerHTML = '<p style="color:red;">Error fetching records. Is the FastAPI server running?</p>';
+            }
+        }
+
+        // Setup form for editing
+        function editRecord(id, title, details) {
+            document.getElementById('recordId').value = id;
+            document.getElementById('titleInput').value = title;
+            document.getElementById('detailsInput').value = details;
+            
+            formTitle.innerText = "Edit Record";
+            submitBtn.innerText = "Update Record";
+            cancelBtn.classList.remove('hidden');
+        }
+
+        // Reset form to Create mode
+        function resetForm() {
+            form.reset();
+            document.getElementById('recordId').value = '';
+            formTitle.innerText = "Add a New Record";
+            submitBtn.innerText = "Submit Record";
+            cancelBtn.classList.add('hidden');
+        }
+
+        // CREATE or UPDATE: Send data to FastAPI
+        form.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            
+            const id = document.getElementById('recordId').value;
+            const title = document.getElementById('titleInput').value;
+            const details = document.getElementById('detailsInput').value;
+
+            const payload = { title: title, details: details };
+
+            if (id) {
+                // UPDATE (PUT)
+                await fetch(`${API_URL}/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            } else {
+                // CREATE (POST)
+                await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            }
+
+            resetForm();
+            fetchRecords();
+        });
+
+        // Load records immediately
+        fetchRecords();
+    </script>
+</body>
+</html>
